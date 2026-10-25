@@ -6,6 +6,8 @@ import httpx
 import llm
 
 from groq import RateLimitError
+from groq import BadRequestError
+
 from llm import LLMClient
 
 
@@ -123,3 +125,69 @@ def test_rate_limit_retry(monkeypatch):
     assert result == "successful_response"
     assert fake_api.calls == 2
     assert delays == [1.0]
+
+def test_invalid_tool_call_retry():
+
+    class FakeCompletions:
+
+        def __init__(self):
+            self.calls = 0
+            self.temperatures = []
+
+        def create(self, **kwargs):
+
+            self.calls += 1
+
+            self.temperatures.append(
+                kwargs["temperature"]
+            )
+
+            if self.calls == 1:
+
+                response = httpx.Response(
+                    400,
+                    request=httpx.Request(
+                        "POST",
+                        "https://api.groq.com/openai/v1/chat/completions"
+                    )
+                )
+
+                raise BadRequestError(
+                    "Parsing failed",
+                    response=response,
+                    body={
+                        "error": {
+                            "code": "output_parse_failed",
+                            "message": "Parsing failed"
+                        }
+                    }
+                )
+
+            return "successful_response"
+
+    fake_api = FakeCompletions()
+
+    client = LLMClient.__new__(LLMClient)
+
+    client.model = "openai/gpt-oss-20b"
+
+    client.client = SimpleNamespace(
+        chat=SimpleNamespace(
+            completions=fake_api
+        )
+    )
+
+    result = client.get_next_action(
+        [
+            {
+                "role": "user",
+                "content": "Inspect the repository."
+            }
+        ]
+    )
+
+    assert result == "successful_response"
+
+    assert fake_api.calls == 2
+
+    assert fake_api.temperatures == [0.2, 0.0]

@@ -7,7 +7,7 @@ from prompts import SYSTEM_PROMPT
 import time
 import math
 
-from groq import Groq, RateLimitError
+from groq import Groq, RateLimitError, BadRequestError
 
 load_dotenv()
 
@@ -106,13 +106,82 @@ class LLMClient:
             "openai/gpt-oss-20b"
         )
 
+    def _request_with_parsing_retry(
+    self,
+    request_messages,
+    require_tool=False
+):
+        """
+        Retry Groq requests when the model generates
+        an invalid tool call.
+
+        Retry at most once with a lower temperature.
+        """
+
+        temperatures = [0.2, 0.0]
+
+        for attempt, temperature in enumerate(temperatures):
+
+            try:
+                return self.client.chat.completions.create(
+                    model=self.model,
+
+                    messages=request_messages,
+
+                    tools=TOOL_DEFINITIONS,
+
+                    tool_choice=(
+                        "required" if require_tool else "auto"
+                    ),
+
+                    temperature=temperature,
+
+                    reasoning_effort="low",
+
+                    parallel_tool_calls=False
+                )
+
+            except BadRequestError as error:
+
+                body = getattr(error, "body", None)
+
+                if not isinstance(body, dict):
+                    raise
+
+                details = body.get("error", body)
+
+                if not isinstance(details, dict):
+                    raise
+
+                error_code = details.get("code")
+
+                recoverable_errors = {
+                    "output_parse_failed",
+                    "tool_use_failed"
+                }
+
+                # Do not retry unrelated HTTP 400 errors.
+                if error_code not in recoverable_errors:
+                    raise
+
+                if attempt == len(temperatures) - 1:
+                    raise RuntimeError(
+                        "Groq could not generate a valid tool "
+                        "call after two attempts."
+                    ) from None
+
+                print(
+                    "[LLM] Invalid tool-call response. "
+                    "Retrying with lower temperature..."
+                )
+
     def get_next_action(self, messages, require_tool=False):
         """
         Request the next LLM action.
 
         Retry temporary rate limits without retrying forever.
         """
-    
+
         request_messages = [
             {
                 "role": "system",
@@ -121,22 +190,16 @@ class LLMClient:
             *messages
         ]
 
-        max_attempts = 3
-        max_retry_delay = 15
+        max_attempts = 4
+        max_retry_delay = 60
 
         for attempt in range(max_attempts):
 
             try:
-                response = self.client.chat.completions.create(
-                    model=self.model,
-                    messages=request_messages,
-                    tools=TOOL_DEFINITIONS,
-                    tool_choice=(
-                        "required" if require_tool else "auto"
-                    )
+                return self._request_with_parsing_retry(
+                    request_messages=request_messages,
+                    require_tool=require_tool
                 )
-
-                return response
 
             except RateLimitError as error:
 

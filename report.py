@@ -4,6 +4,8 @@ import re
 import tempfile
 from pathlib import Path
 
+import yaml
+
 
 REQUIRED_FIELDS = {
     "rule_id",
@@ -159,6 +161,63 @@ def validate_violation(violation, repo_path):
 
     return cleaned
 
+def verify_yaml_syntax_finding(finding, repo_path):
+    """
+    Independently verify claims about YAML syntax.
+
+    Returns True for findings outside this specific
+    verification category.
+
+    Returns False when a claimed YAML syntax problem
+    cannot be confirmed.
+    """
+
+    description = finding["description"].lower()
+
+    is_yaml_claim = (
+        "yaml" in description
+        and any(
+            word in description
+            for word in (
+                "syntax",
+                "indent",
+                "parse",
+                "invalid"
+            )
+        )
+    )
+
+    if not is_yaml_claim:
+        return True
+
+    file_path = finding["file"]
+
+    if file_path is None:
+        return False
+
+    if not file_path.endswith((".yml", ".yaml")):
+        return False
+
+    target = Path(repo_path).resolve() / file_path
+
+    try:
+        if target.stat().st_size > 200_000:
+            return False
+
+        content = target.read_text(encoding="utf-8")
+
+        yaml.safe_load(content)
+
+    except yaml.YAMLError:
+        # The YAML parser confirms an error.
+        return True
+
+    except (OSError, UnicodeError):
+        # The syntax could not be verified.
+        return False
+
+    # YAML parsed successfully.
+    return False
 
 def build_report(repo_url, llm_output, repo_path):
     """
@@ -196,6 +255,12 @@ def build_report(repo_url, llm_output, repo_path):
             violation,
             repo_path
         )
+
+        if not verify_yaml_syntax_finding(
+            finding,
+            repo_path
+        ):
+            continue
 
         # Avoid reporting the same rule at the same location
         # more than once.

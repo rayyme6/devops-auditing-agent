@@ -176,3 +176,67 @@ def test_cannot_write_inside_repository(
             sample_repo / "report.json",
             sample_repo
         )
+
+def test_reject_false_yaml_syntax_finding(
+    sample_repo,
+    valid_finding
+):
+
+    valid_finding["rule_id"] = "CI-001"
+
+    valid_finding["description"] = (
+        "YAML syntax error in workflow configuration"
+    )
+
+    valid_finding["line"] = 2
+
+    llm_output = json.dumps({
+        "violations": [valid_finding]
+    })
+
+    report = build_report(
+        "https://github.com/example/demo",
+        llm_output,
+        sample_repo
+    )
+
+    assert report["violations"] == []
+
+def test_accept_real_yaml_syntax_finding(
+    sample_repo,
+    valid_finding
+):
+
+    workflow = (
+        sample_repo
+        / ".github"
+        / "workflows"
+        / "ci.yml"
+    )
+
+    workflow.write_text(
+        "name: [invalid\n",
+        encoding="utf-8"
+    )
+
+    valid_finding["rule_id"] = "CI-001"
+
+    valid_finding["description"] = (
+        "YAML syntax error in workflow configuration"
+    )
+
+    valid_finding["line"] = 1
+
+    llm_output = json.dumps({
+        "violations": [valid_finding]
+    })
+
+    report = build_report(
+        "https://github.com/example/demo",
+        llm_output,
+        sample_repo
+    )
+
+    assert len(report["violations"]) == 1
+
+    assert report["violations"][0]["rule_id"] == "CI-001"

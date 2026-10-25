@@ -54,6 +54,16 @@ class FakeTools:
         self.executed.append("git_log")
         return "abc123 Initial commit"
 
+    def validate_yaml(self, path):
+
+        self.executed.append("validate_yaml")
+
+        return {
+            "valid": True,
+            "file": path,
+            "message": "YAML syntax is valid"
+        }
+
 
 class FakeLLM:
 
@@ -156,3 +166,24 @@ def test_invalid_tool_arguments():
     )
 
     assert result["success"] is False
+
+def test_validate_yaml_dispatch():
+
+    fake_tools = FakeTools()
+
+    agent = DevOpsAgent(
+        repo_path="unused",
+        llm=FakeLLM(),
+        tools=fake_tools
+    )
+
+    result = agent.execute_tool(
+        "validate_yaml",
+        {"path": ".github/workflows/ci.yml"}
+    )
+
+    assert result["success"] is True
+
+    assert result["result"]["valid"] is True
+
+    assert "validate_yaml" in fake_tools.executed

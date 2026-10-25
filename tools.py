@@ -2,6 +2,7 @@ import subprocess
 import re
 from pathlib import Path
 from urllib.parse import urlparse
+import yaml
 
 
 def clone_repository(repo_url, destination):
@@ -257,3 +258,42 @@ class RepoTools:
             self._redact(line)
             for line in result.stdout.splitlines()
         )
+
+    def validate_yaml(self, path):
+        """
+        Check whether a YAML file has valid syntax.
+
+        This checks syntax, not GitHub Actions semantics.
+        """
+
+        if not path.endswith((".yml", ".yaml")):
+            return {
+                "valid": False,
+                "error": "Not a YAML file"
+            }
+
+        content = self._read_text(path)
+
+        try:
+            yaml.safe_load(content)
+
+            return {
+                "valid": True,
+                "file": path,
+                "message": "YAML syntax is valid"
+            }
+
+        except yaml.YAMLError as error:
+
+            mark = getattr(error, "problem_mark", None)
+
+            return {
+                "valid": False,
+                "file": path,
+                "line": (
+                    mark.line + 1
+                    if mark is not None
+                    else None
+                ),
+                "error": "YAML syntax error detected"
+            }

@@ -99,3 +99,36 @@ def test_path_traversal_blocked(sample_repo):
 
     with pytest.raises(ValueError):
         tools.read_file("../outside.txt")
+
+def test_valid_yaml(sample_repo):
+
+    tools = RepoTools(sample_repo)
+
+    workflow = sample_repo / "ci.yml"
+
+    workflow.write_text(
+        "name: CI\n"
+        "on:\n"
+        "  push:\n",
+        encoding="utf-8"
+    )
+
+    result = tools.validate_yaml("ci.yml")
+
+    assert result["valid"] is True
+
+
+def test_invalid_yaml(sample_repo):
+
+    tools = RepoTools(sample_repo)
+
+    workflow = sample_repo / "bad.yml"
+
+    workflow.write_text(
+        "name: [invalid\n",
+        encoding="utf-8"
+    )
+
+    result = tools.validate_yaml("bad.yml")
+
+    assert result["valid"] is False

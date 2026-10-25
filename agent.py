@@ -47,14 +47,16 @@ class DevOpsAgent:
             "list_files": self.tools.list_files,
             "read_file": self.tools.read_file,
             "search_code": self.tools.search_code,
-            "git_log": self.tools.git_log
+            "git_log": self.tools.git_log,
+            "validate_yaml": self.tools.validate_yaml
         }
 
         self.expected_arguments = {
             "list_files": set(),
             "read_file": {"path"},
             "search_code": {"pattern"},
-            "git_log": set()
+            "git_log": set(),
+            "validate_yaml": {"path"}
         }
 
     def execute_tool(self, tool_name, arguments):

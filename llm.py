@@ -56,6 +56,25 @@ TOOL_DEFINITIONS = [
     make_tool(
         "git_log",
         "Inspect recent Git commit history."
+    ), 
+
+    make_tool(
+        "validate_yaml",
+        (
+            "Validate the YAML syntax of a repository file. "
+            "Use this before reporting YAML syntax or "
+            "indentation errors. This tool checks YAML syntax, "
+            "not GitHub Actions workflow semantics."
+        ),
+        {
+            "path": {
+                "type": "string",
+                "description": (
+                    "Repository-relative path to a YAML file"
+                )
+            }
+        },
+        ["path"]
     )
 ]
 

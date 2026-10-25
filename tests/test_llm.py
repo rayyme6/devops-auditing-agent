@@ -12,7 +12,8 @@ def test_required_tools():
         "list_files",
         "read_file",
         "search_code",
-        "git_log"
+        "git_log",
+        "validate_yaml"
     }
 
     assert names == expected
@@ -39,3 +40,20 @@ def test_list_files_no_arguments():
 
     assert parameters["properties"] == {}
     assert parameters["required"] == []
+
+def test_validate_yaml_schema():
+
+    tool = next(
+        tool for tool in TOOL_DEFINITIONS
+        if tool["function"]["name"] == "validate_yaml"
+    )
+
+    parameters = tool["function"]["parameters"]
+
+    assert parameters["type"] == "object"
+
+    assert "path" in parameters["properties"]
+
+    assert parameters["required"] == ["path"]
+
+    assert parameters["additionalProperties"] is False

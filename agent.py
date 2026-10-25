@@ -129,20 +129,27 @@ class DevOpsAgent:
             {
                 "role": "user",
                 "content": (
-                    "Investigate this locally available Git "
-                    "repository for DevOps best-practice issues. "
+                    "Investigate this locally available Git repository "
+                    "for genuine DevOps best-practice violations. "
+
                     "Begin by discovering its structure. "
-                    "Choose subsequent tools based on the "
-                    "evidence you observe. "
-                    "Inspect relevant source, testing, CI, "
-                    "dependency, and configuration files. "
-                    "Do not assume that missing optional files "
-                    "represent violations. "
-                    "Do not invent evidence or reveal secrets. "
-                    "When your investigation is complete, "
-                    "provide a short preliminary summary. "
-                    "Do not claim checks were performed unless "
-                    "you actually used the relevant tools."
+
+                    "Choose subsequent inspection tools dynamically "
+                    "based on the evidence you observe. "
+
+                    "Investigate relevant security, testing, "
+                    "dependencies, CI/CD, configuration, "
+                    "repository hygiene, code quality, "
+                    "collaboration, and build practices. "
+
+                    "Do not invent missing files or vulnerabilities. "
+
+                    "Do not report optional missing tools as defects "
+                    "when acceptable alternatives exist. "
+
+                    "When you have sufficient evidence, finish "
+                    "with ONLY the JSON object described "
+                    "in your system instructions."
                 )
             }
         ]

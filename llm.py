@@ -2,6 +2,7 @@ import os
 
 from dotenv import load_dotenv
 from groq import Groq
+from prompts import SYSTEM_PROMPT
 
 load_dotenv()
 
@@ -89,15 +90,7 @@ class LLMClient:
             messages=[
                 {
                     "role": "system",
-                    "content": (
-                        "You are an autonomous DevOps auditing agent. "
-                        "Investigate GitHub repositories using tools. "
-                        "Select tools dynamically based on observations. "
-                        "Never invent evidence. "
-                        "Do not modify repositories. "
-                        "Never expose secrets. "
-                        "Investigate suspected issues before reporting."
-                    )
+                    "content": SYSTEM_PROMPT
                 },
                 *messages
             ],

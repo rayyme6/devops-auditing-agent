@@ -5,6 +5,7 @@ import tempfile
 from pathlib import Path
 
 import yaml
+from yaml.nodes import MappingNode, ScalarNode
 
 
 REQUIRED_FIELDS = {
@@ -219,6 +220,95 @@ def verify_yaml_syntax_finding(finding, repo_path):
     # YAML parsed successfully.
     return False
 
+def verify_workflow_permissions(finding, repo_path):
+    """
+    Independently verify findings that claim
+    GitHub Actions uses 'permissions: write-all'.
+
+    Checks workflow-level and job-level permissions.
+    """
+
+    description = finding["description"].lower()
+    evidence = finding["evidence"].lower()
+
+    claim = description + " " + evidence
+
+    # This verifier handles only write-all permission claims.
+    if not (
+        "write-all" in claim
+        and "permission" in claim
+    ):
+        return True
+
+    file_path = finding["file"]
+    line_number = finding["line"]
+
+    if not file_path or line_number is None:
+        return False
+
+    if not (
+        file_path.startswith(".github/workflows/")
+        and file_path.endswith((".yml", ".yaml"))
+    ):
+        return False
+
+    target = Path(repo_path).resolve() / file_path
+
+    try:
+        if target.stat().st_size > 200_000:
+            return False
+
+        content = target.read_text(encoding="utf-8")
+
+        # Parse YAML into nodes while preserving line numbers.
+        root = yaml.compose(
+            content,
+            Loader=yaml.SafeLoader
+        )
+
+        if not isinstance(root, MappingNode):
+            return False
+
+        def permission_lines(mapping):
+            lines = set()
+
+            for key, value in mapping.value:
+
+                if (
+                    isinstance(key, ScalarNode)
+                    and key.value == "permissions"
+                    and isinstance(value, ScalarNode)
+                    and value.value == "write-all"
+                ):
+                    lines.add(value.start_mark.line + 1)
+
+            return lines
+
+        # Workflow-level permissions
+        confirmed_lines = permission_lines(root)
+
+        # Job-level permissions
+        for key, value in root.value:
+
+            if (
+                not isinstance(key, ScalarNode)
+                or key.value != "jobs"
+                or not isinstance(value, MappingNode)
+            ):
+                continue
+
+            for job_name, job_config in value.value:
+
+                if isinstance(job_config, MappingNode):
+                    confirmed_lines.update(
+                        permission_lines(job_config)
+                    )
+
+        return line_number in confirmed_lines
+
+    except (yaml.YAMLError, OSError, UnicodeError):
+        return False
+
 def build_report(repo_url, llm_output, repo_path):
     """
     Convert LLM-generated JSON into a validated report.
@@ -257,6 +347,13 @@ def build_report(repo_url, llm_output, repo_path):
         )
 
         if not verify_yaml_syntax_finding(
+            finding,
+            repo_path
+        ):
+            continue
+
+        # Verify reported write-all workflow permissions.
+        if not verify_workflow_permissions(
             finding,
             repo_path
         ):

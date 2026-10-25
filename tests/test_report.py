@@ -214,18 +214,30 @@ def test_accept_real_yaml_syntax_finding(
         / "ci.yml"
     )
 
+    # Create genuinely invalid YAML.
     workflow.write_text(
         "name: [invalid\n",
         encoding="utf-8"
     )
 
-    valid_finding["rule_id"] = "CI-001"
-
-    valid_finding["description"] = (
-        "YAML syntax error in workflow configuration"
-    )
-
-    valid_finding["line"] = 1
+    # Ensure the finding describes the actual YAML error.
+    valid_finding.update({
+        "rule_id": "CI-001",
+        "category": "GitHub Actions / CI",
+        "severity": "high",
+        "file": ".github/workflows/ci.yml",
+        "line": 1,
+        "description": (
+            "YAML syntax error in workflow configuration"
+        ),
+        "evidence": (
+            "The YAML parser rejects an unclosed "
+            "sequence beginning on line 1."
+        ),
+        "recommendation": (
+            "Correct the YAML sequence syntax."
+        )
+    })
 
     llm_output = json.dumps({
         "violations": [valid_finding]
@@ -240,3 +252,101 @@ def test_accept_real_yaml_syntax_finding(
     assert len(report["violations"]) == 1
 
     assert report["violations"][0]["rule_id"] == "CI-001"
+
+def test_reject_false_workflow_permissions(
+    sample_repo,
+    valid_finding
+):
+
+    workflow = (
+        sample_repo
+        / ".github"
+        / "workflows"
+        / "ci.yml"
+    )
+
+    workflow.write_text(
+        "name: CI\n"
+        "on:\n"
+        "  push:\n"
+        "permissions:\n"
+        "  contents: read\n",
+        encoding="utf-8"
+    )
+
+    report = build_report(
+        "https://github.com/example/demo",
+        json.dumps({
+            "violations": [valid_finding]
+        }),
+        sample_repo
+    )
+
+    assert report["violations"] == []
+
+def test_accept_job_level_write_all(
+    sample_repo,
+    valid_finding
+):
+
+    workflow = (
+        sample_repo
+        / ".github"
+        / "workflows"
+        / "ci.yml"
+    )
+
+    workflow.write_text(
+        "name: CI\n"
+        "jobs:\n"
+        "  build:\n"
+        "    runs-on: ubuntu-latest\n"
+        "    permissions: write-all\n",
+        encoding="utf-8"
+    )
+
+    valid_finding["line"] = 5
+
+    report = build_report(
+        "https://github.com/example/demo",
+        json.dumps({
+            "violations": [valid_finding]
+        }),
+        sample_repo
+    )
+
+    assert len(report["violations"]) == 1
+
+    assert report["violations"][0]["rule_id"] == "SEC-001"
+
+def test_ignore_permissions_in_comments(
+    sample_repo,
+    valid_finding
+):
+
+    workflow = (
+        sample_repo
+        / ".github"
+        / "workflows"
+        / "ci.yml"
+    )
+
+    workflow.write_text(
+        "name: CI\n"
+        "# permissions: write-all\n"
+        "permissions:\n"
+        "  contents: read\n",
+        encoding="utf-8"
+    )
+
+    valid_finding["line"] = 2
+
+    report = build_report(
+        "https://github.com/example/demo",
+        json.dumps({
+            "violations": [valid_finding]
+        }),
+        sample_repo
+    )
+
+    assert report["violations"] == []

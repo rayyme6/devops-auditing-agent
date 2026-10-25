@@ -73,6 +73,15 @@ def clone_repository(repo_url, destination):
     except subprocess.CalledProcessError:
         raise RuntimeError("Failed to clone repository")
 
+SECRET_LIKE_VALUES = re.compile(
+    r"\b(?:"
+    r"gh[pousr]_[A-Za-z0-9_]{16,}"
+    r"|github_pat_[A-Za-z0-9_]{16,}"
+    r"|sk-[A-Za-z0-9_-]{16,}"
+    r"|AKIA[0-9A-Z]{16}"
+    r")\b"
+)
+
 class RepoTools:
     """
     Tools used by the AI agent to inspect Git repositories.
@@ -159,8 +168,8 @@ class RepoTools:
     @staticmethod
     def _redact(line):
         """
-        Mask potentially sensitive lines before returning
-        them to the AI agent.
+        Prevent common credentials from being returned
+        to the LLM through repository inspection tools.
         """
 
         sensitive_terms = [
@@ -173,8 +182,22 @@ class RepoTools:
             "private_key"
         ]
 
-        if any(term in line.lower() for term in sensitive_terms):
-            return "[REDACTED: potentially sensitive line]"
+        lower_line = line.lower()
+
+        contains_sensitive_keyword = any(
+            term in lower_line
+            for term in sensitive_terms
+        )
+
+        contains_credential_pattern = bool(
+            SECRET_LIKE_VALUES.search(line)
+        )
+
+        if (
+            contains_sensitive_keyword
+            or contains_credential_pattern
+        ):
+            return "[REDACTED: potentially sensitive content]"
 
         return line[:500]
 

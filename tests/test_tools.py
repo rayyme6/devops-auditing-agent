@@ -132,3 +132,56 @@ def test_invalid_yaml(sample_repo):
     result = tools.validate_yaml("bad.yml")
 
     assert result["valid"] is False
+
+def test_read_file_redacts_credential(sample_repo):
+
+    tools = RepoTools(sample_repo)
+
+    # Synthetic test value, not a real credential.
+    fake_secret = "github_pat_" + "A" * 25
+
+    file_path = sample_repo / "example.py"
+
+    file_path.write_text(
+        f'print("{fake_secret}")\n',
+        encoding="utf-8"
+    )
+
+    content = tools.read_file("example.py")
+
+    assert fake_secret not in content
+    assert "[REDACTED" in content
+
+def test_search_code_redacts_credentials(sample_repo):
+
+    tools = RepoTools(sample_repo)
+
+    fake_secret = "github_pat_" + "B" * 25
+
+    file_path = sample_repo / "credentials.py"
+
+    file_path.write_text(
+        f'token = "{fake_secret}"\n',
+        encoding="utf-8"
+    )
+
+    subprocess.run(
+        [
+            "git",
+            "-C",
+            str(sample_repo),
+            "add",
+            "credentials.py"
+        ],
+        check=True
+    )
+
+    results = tools.search_code("token")
+
+    assert len(results) == 1
+
+    assert results[0]["file"] == "credentials.py"
+
+    assert fake_secret not in results[0]["snippet"]
+
+    assert "[REDACTED" in results[0]["snippet"]

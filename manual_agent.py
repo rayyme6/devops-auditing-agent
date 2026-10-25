@@ -6,6 +6,9 @@ from agent import DevOpsAgent
 import json
 from report import build_report, save_report
 
+from tools import RepoTools
+
+
 
 def main():
 
@@ -36,24 +39,31 @@ def main():
         workflow_file = workflow_dir / "ci.yml"
 
         workflow_file.write_text(
-            """name: CI
-
-        on:
-        push:
-
-        permissions: write-all
-
-        jobs:
-        check:
-            runs-on: ubuntu-latest
-
-            steps:
-            - uses: actions/checkout@v4
-            - name: Run check
-                run: echo "Checking project"
-        """,
+            "name: CI\n"
+            "\n"
+            "on:\n"
+            "  push:\n"
+            "\n"
+            "permissions: write-all\n"
+            "\n"
+            "jobs:\n"
+            "  check:\n"
+            "    runs-on: ubuntu-latest\n"
+            "\n"
+            "    steps:\n"
+            "      - uses: actions/checkout@v4\n"
+            "      - name: Run check\n"
+            "        run: echo \"Checking project\"\n",
             encoding="utf-8"
         )
+
+        print("\n========== WORKFLOW CONTENT ==========")
+
+        for number, line in enumerate(
+            workflow_file.read_text().splitlines(),
+            start=1
+        ):
+            print(f"{number}: {line!r}")
 
         # Initialize a local Git repository.
         subprocess.run(
@@ -84,6 +94,20 @@ def main():
         )
 
         print("Starting autonomous repository inspection...")
+
+        print("\n========== YAML VALIDATION ==========")
+
+        tools = RepoTools(repo_path)
+
+        yaml_result = tools.validate_yaml(
+            ".github/workflows/ci.yml"
+        )
+
+        print(yaml_result)
+
+        assert yaml_result["valid"] is True, (
+            f"Test workflow contains invalid YAML: {yaml_result}"
+        )
 
         agent = DevOpsAgent(
             repo_path=repo_path,

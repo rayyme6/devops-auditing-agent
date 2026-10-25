@@ -5,3 +5,6 @@ __pycache__/
 .pytest_cache/
 demo-repo/
 manual_report.json
+# Generated local reports
+report.json
+manual_report.json

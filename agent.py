@@ -3,6 +3,16 @@ import json
 from llm import LLMClient
 from tools import RepoTools
 
+import argparse
+import sys
+from pathlib import Path
+from tempfile import TemporaryDirectory
+
+from tools import clone_repository
+from report import build_report, save_report
+
+from groq import RateLimitError
+
 
 class DevOpsAgent:
     """
@@ -12,7 +22,7 @@ class DevOpsAgent:
     Python validates and executes those tool requests.
     """
 
-    MAX_RESULT_CHARS = 12000
+    MAX_RESULT_CHARS = 4000
 
     def __init__(
         self,
@@ -233,3 +243,145 @@ class DevOpsAgent:
         raise RuntimeError(
             "Agent exceeded the maximum investigation steps"
         )
+
+def main(argv=None):
+    """
+    Command-line entry point for the DevOps auditing agent.
+    """
+
+    parser = argparse.ArgumentParser(
+        description="AI-powered DevOps Repository Auditing Agent"
+    )
+
+    parser.add_argument(
+        "--repo",
+        required=True,
+        help="Public GitHub repository URL"
+    )
+
+    parser.add_argument(
+        "--output",
+        required=True,
+        help="Path to the JSON report"
+    )
+
+    args = parser.parse_args(argv)
+
+    print("\n===================================")
+    print("      DevOps Repository Audit")
+    print("===================================")
+
+    try:
+        # Inspect the repository in a temporary directory.
+        with TemporaryDirectory(
+            prefix="devops-audit-"
+        ) as temp_dir:
+
+            destination = Path(temp_dir) / "repository"
+
+            # Step 1: Clone repository
+            print("\n[1] Cloning repository...")
+
+            repo_path = clone_repository(
+                args.repo,
+                destination
+            )
+
+            # Step 2: Initialize AI agent
+            print("\n[2] Initializing AI agent...")
+
+            auditing_agent = DevOpsAgent(
+                repo_path=repo_path,
+                max_steps=20
+            )
+
+            # Step 3: Execute autonomous investigation
+            print("\n[3] Starting repository investigation...")
+
+            llm_output = auditing_agent.run()
+
+            # Step 4: Validate findings
+            print("\n[4] Validating audit findings...")
+
+            report = build_report(
+                repo_url=args.repo,
+                llm_output=llm_output,
+                repo_path=repo_path
+            )
+
+            # Step 5: Save JSON report
+            print("\n[5] Saving JSON report...")
+
+            output_path = save_report(
+                report=report,
+                output_path=args.output,
+                repo_path=repo_path
+            )
+
+            print("\n===================================")
+            print("        AUDIT COMPLETED")
+            print("===================================")
+
+            print(
+                f"\nViolations found: "
+                f"{len(report['violations'])}"
+            )
+
+            print(f"Report saved to: {output_path}")
+
+            return 0
+
+    except RateLimitError as error:
+
+        response = getattr(error, "response", None)
+
+        headers = (
+            response.headers
+            if response is not None
+            else {}
+        )
+
+        print(
+            "\nERROR: Groq API rate limit exceeded.",
+            file=sys.stderr
+        )
+
+        retry_after = headers.get("retry-after")
+
+        if retry_after:
+            print(
+                f"Suggested retry delay: {retry_after} seconds",
+                file=sys.stderr
+            )
+
+        print(
+            "Check your GroqCloud rate limits and quota.",
+            file=sys.stderr
+        )
+
+        return 1
+
+    except (ValueError, RuntimeError, OSError) as error:
+
+        print(
+            f"\nERROR: {error}",
+            file=sys.stderr
+        )
+
+        return 1
+
+    except Exception as error:
+
+        print(
+            f"\nERROR ({type(error).__name__}): "
+            "Audit could not be completed. "
+            "Check the repository URL, API configuration, "
+            "network connection, and available API quota.",
+            file=sys.stderr
+        )
+
+        return 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())

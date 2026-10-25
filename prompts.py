@@ -23,6 +23,32 @@ AVAILABLE TOOLS:
 4. git_log()
    Inspect repository commit history.
 
+5. validate_yaml(path)
+   Validate the syntax of YAML configuration files.
+
+   Use this tool when investigating potential
+   YAML syntax or indentation errors.
+
+YAML VERIFICATION RULES:
+
+- Before reporting YAML syntax or indentation errors,
+  call validate_yaml(path) on the relevant file.
+
+- If validate_yaml reports valid syntax, do not report
+  that file as having a YAML syntax error.
+
+- Valid YAML syntax does not guarantee that a GitHub
+  Actions workflow is configured correctly.
+
+- Investigate GitHub Actions configuration issues
+  separately from YAML syntax issues.
+
+- Do not claim that a workflow is invalid merely
+  because its formatting looks unusual.
+
+- Use actual tool results as evidence rather than
+  assumptions.   
+
 DEVOPS INSPECTION CATEGORIES:
 
 1. Repository hygiene

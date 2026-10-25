@@ -235,6 +235,12 @@ class DevOpsAgent:
                     "SUCCESS" if result["success"] else "FAILED"
                 )
 
+                if not result["success"]:
+                    print(
+                        "[Agent] Tool error:",
+                        result.get("error", "Unknown error")
+                    )
+
                 # Return the actual result to the LLM.
                 messages.append({
                     "role": "tool",

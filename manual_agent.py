@@ -4,6 +4,7 @@ from tempfile import TemporaryDirectory
 
 from agent import DevOpsAgent
 import json
+from report import build_report, save_report
 
 
 def main():
@@ -91,11 +92,25 @@ def main():
 
         result = agent.run()
 
-        print("\n========== DEVOPS AUDIT FINDINGS ==========")
+        print("\n========== VALIDATING FINDINGS ==========")
 
-        findings = json.loads(result)
+        report = build_report(
+            repo_url="https://github.com/example/manual-test",
+            llm_output=result,
+            repo_path=repo_path
+        )
 
-        print(json.dumps(findings, indent=2))
+        print(json.dumps(report, indent=2))
+
+        output_file = "manual_report.json"
+
+        save_report(
+            report=report,
+            output_path=output_file,
+            repo_path=repo_path
+        )
+
+        print(f"\nReport saved to: {output_file}")
 
 
 if __name__ == "__main__":
